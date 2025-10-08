@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
-import { Mic, Volume2, Loader2 } from "lucide-react";
+import { Mic, Volume2, Loader2, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -55,29 +55,51 @@ export const LyricGenerator = () => {
     }
   };
 
-  const handlePlayAudio = async () => {
+  const handlePlayAudio = () => {
     if (!generatedLyrics) {
       toast.error("Generate lyrics first!");
+      return;
+    }
+
+    // Check if browser supports speech synthesis
+    if (!('speechSynthesis' in window)) {
+      toast.error("Your browser doesn't support text-to-speech");
       return;
     }
 
     setIsPlaying(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("text-to-speech", {
-        body: {
-          text: generatedLyrics,
-          language,
-        },
-      });
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
 
-      if (error) throw error;
-
-      // Play the audio
-      const audio = new Audio(`data:audio/mp3;base64,${data.audioContent}`);
-      audio.onended = () => setIsPlaying(false);
-      audio.play();
+      const utterance = new SpeechSynthesisUtterance(generatedLyrics);
       
+      // Set language based on selection
+      const languageMap: Record<string, string> = {
+        'english': 'en-US',
+        'hindi': 'hi-IN',
+        'spanish': 'es-ES',
+        'tamil': 'ta-IN',
+        'malayalam': 'ml-IN',
+      };
+      
+      utterance.lang = languageMap[language] || 'en-US';
+      utterance.rate = 0.9;
+      utterance.pitch = 1;
+
+      utterance.onend = () => {
+        setIsPlaying(false);
+        toast.success("Playback finished!");
+      };
+
+      utterance.onerror = (event) => {
+        console.error("Speech synthesis error:", event);
+        setIsPlaying(false);
+        toast.error("Failed to play audio");
+      };
+
+      window.speechSynthesis.speak(utterance);
       toast.success("Playing lyrics!");
     } catch (error: any) {
       console.error("Error playing audio:", error);
@@ -86,12 +108,36 @@ export const LyricGenerator = () => {
     }
   };
 
+  const handleStopAudio = () => {
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    toast.info("Playback stopped");
+  };
+
+  const handleDownload = () => {
+    if (!generatedLyrics) {
+      toast.error("Generate lyrics first!");
+      return;
+    }
+
+    const blob = new Blob([generatedLyrics], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `lyrics-${topic.replace(/\s+/g, '-').toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Lyrics downloaded!");
+  };
+
   return (
     <section id="generator" className="py-20 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Generator Panel */}
-          <div className="glass-card rounded-3xl p-8 space-y-6">
+          <div className="glass-card shimmer rounded-3xl p-8 space-y-6">
             <h2 className="text-3xl font-display font-bold gradient-text mb-6">
               🎵 Lyric Generator
             </h2>
@@ -201,7 +247,7 @@ export const LyricGenerator = () => {
               <Button
                 onClick={handleGenerate}
                 disabled={isGenerating}
-                className="w-full glow-button bg-gradient-to-r from-primary via-secondary to-accent text-primary-foreground text-lg py-6 rounded-xl font-semibold"
+                className="w-full glow-button shimmer bg-gradient-to-r from-primary via-secondary to-accent text-primary-foreground text-lg py-6 rounded-xl font-semibold"
               >
                 {isGenerating ? (
                   <>
@@ -219,37 +265,47 @@ export const LyricGenerator = () => {
           </div>
 
           {/* Results Panel */}
-          <div className="glass-card rounded-3xl p-8">
-            <div className="flex items-center justify-between mb-6">
+          <div className="glass-card shimmer rounded-3xl p-8">
+            <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
               <h3 className="text-2xl font-display font-bold gradient-text">
                 Generated Lyrics
               </h3>
               {generatedLyrics && (
-                <Button
-                  onClick={handlePlayAudio}
-                  disabled={isPlaying}
-                  variant="outline"
-                  size="sm"
-                  className="border-primary/50 hover:bg-primary/10"
-                >
-                  {isPlaying ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Playing...
-                    </>
-                  ) : (
-                    <>
-                      <Volume2 className="mr-2 h-4 w-4" />
-                      Play Audio
-                    </>
-                  )}
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={isPlaying ? handleStopAudio : handlePlayAudio}
+                    variant="outline"
+                    size="sm"
+                    className="border-primary/50 hover:bg-primary/10"
+                  >
+                    {isPlaying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Stop
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="mr-2 h-4 w-4" />
+                        Play
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={handleDownload}
+                    variant="outline"
+                    size="sm"
+                    className="border-secondary/50 hover:bg-secondary/10"
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Save
+                  </Button>
+                </div>
               )}
             </div>
 
             <div className="min-h-[400px] bg-muted/30 rounded-xl p-6 border border-border/30">
               {generatedLyrics ? (
-                <pre className="whitespace-pre-wrap font-sans text-foreground/90 leading-relaxed">
+                <pre className="whitespace-pre-wrap font-sans text-foreground/95 leading-relaxed">
                   {generatedLyrics}
                 </pre>
               ) : (
