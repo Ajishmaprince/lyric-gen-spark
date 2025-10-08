@@ -1,12 +1,28 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useRef } from "react";
+import { Hero } from "@/components/Hero";
+import { LyricGenerator } from "@/components/LyricGenerator";
+import { Features } from "@/components/Features";
+import { About } from "@/components/About";
+import { TechStack } from "@/components/TechStack";
+import { Footer } from "@/components/Footer";
 
 const Index = () => {
+  const generatorRef = useRef<HTMLDivElement>(null);
+
+  const scrollToGenerator = () => {
+    generatorRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <div className="min-h-screen">
+      <Hero onScrollToGenerator={scrollToGenerator} />
+      <div ref={generatorRef}>
+        <LyricGenerator />
       </div>
+      <Features />
+      <About />
+      <TechStack />
+      <Footer />
     </div>
   );
 };
